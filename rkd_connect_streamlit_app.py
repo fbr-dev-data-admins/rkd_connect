@@ -285,10 +285,14 @@ if st.button("Process Files", disabled=not all([rkd_appended_phones, rkd_data_up
                         'description':    description,
                     })
 
-            # ── Steps 6 & 7: Data upload processing ─────────────────────
+            # ── Steps 6 & 7: Data upload processing
             no_matching_rows = []
             action_date_rows = []
             action_note_rows = []
+            debug_rows = []
+
+            # Normalize RE action map keys for comparison
+            re_action_map_lower = {k.lstrip('0') or '0': v for k, v in re_actions_map.items()}
 
             for _, row in df_upload.iterrows():
                 const_id       = safe_str(row.get('Constituent ID', ''))
@@ -297,16 +301,49 @@ if st.button("Process Files", disabled=not all([rkd_appended_phones, rkd_data_up
                 call_notes_val = safe_str(row.get('Call Notes', ''))
 
                 upload_date = parse_date(time_raw)
+
+                # Try both original and stripped-leading-zero versions of const_id
+                const_id_stripped = const_id.lstrip('0') or '0'
+                candidates = (
+                    re_actions_map.get(const_id)
+                    or re_actions_map.get(const_id_stripped)
+                    or re_action_map_lower.get(const_id_stripped)
+                    or []
+                )
+
+                debug_info = {
+                    'Constituent ID':      const_id,
+                    'Time (raw)':          time_raw,
+                    'Parsed upload_date':  str(upload_date),
+                    'ID found in RE map':  bool(candidates),
+                    'Candidate actions':   len(candidates),
+                    'Status':              '',
+                }
+
                 if upload_date is None:
+                    debug_info['Status'] = 'FAIL: could not parse upload date'
+                    debug_rows.append(debug_info)
                     no_matching_rows.append(row)
                     continue
 
-                candidates = re_actions_map.get(const_id, [])
-                matching   = [a for a in candidates if 0 <= (upload_date - a['action_date']).days <= 45]
+                matching = []
+                date_details = []
+                for a in candidates:
+                    delta = (upload_date - a['action_date']).days
+                    date_details.append(f"act={a['action_date'].strftime('%m/%d/%Y')} delta={delta}d")
+                    if 0 <= delta <= 45:
+                        matching.append(a)
+
+                debug_info['Date deltas'] = ' | '.join(date_details)
 
                 if not matching:
+                    debug_info['Status'] = 'FAIL: no action within 45 days' if candidates else 'FAIL: constituent ID not in RE actions map'
+                    debug_rows.append(debug_info)
                     no_matching_rows.append(row)
                     continue
+
+                debug_info['Status'] = f'MATCHED {len(matching)} action(s)'
+                debug_rows.append(debug_info)
 
                 fmt_time  = fmt_date(time_raw)
                 note_text = f"RKD Connect thank you call result - {result_val}"
@@ -327,12 +364,14 @@ if st.button("Process Files", disabled=not all([rkd_appended_phones, rkd_data_up
                         'CANoteDate':  fmt_time,
                         'CANoteType':  'Phone Call',
                         'CANoteNotes': note_text,
-                        'CANoteDesc':  re.sub(r'(?i)\bReceiving\b', 'Received', a['description']),
+                        'CANoteDesc':  re.sub(r'(?i)\\bReceiving\\b', 'Received', a['description']),
                     })
 
             df_no_matching = pd.DataFrame(no_matching_rows)
             df_action_date = pd.DataFrame(action_date_rows)
             df_action_note = pd.DataFrame(action_note_rows)
+            df_debug       = pd.DataFrame(debug_rows)
+
 
             # ── Exceptions workbook ──────────────────────────────────────
             exc_buf     = io.BytesIO()
@@ -398,6 +437,15 @@ if st.button("Process Files", disabled=not all([rkd_appended_phones, rkd_data_up
                         st.info("No records in this output.")
                     else:
                         st.dataframe(df, use_container_width=True)
+
+            with st.expander("🔍 Action Matching Debug (expand to diagnose issues)"):
+                if df_debug.empty:
+                    st.info("No upload rows processed.")
+                else:
+                    st.caption("Shows every row from the data upload file and why it matched or failed.")
+                    st.dataframe(df_debug, use_container_width=True)
+                    # Also show what RE action map keys look like for comparison
+                    st.caption(f"RE action map contains {len(re_actions_map)} unique Constituent IDs. Sample keys: {list(re_actions_map.keys())[:10]}")
 
         except Exception as e:
             st.error(f"An error occurred: {e}")
