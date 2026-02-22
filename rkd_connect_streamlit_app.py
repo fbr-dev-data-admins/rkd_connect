@@ -64,7 +64,18 @@ def prev_month_label():
 def fmt_date(val):
     if pd.isna(val) or str(val).strip() == "":
         return ""
-    for fmt in ["%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%m/%d/%Y", "%m/%d/%y", "%m-%d-%Y"]:
+    for fmt in [
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%d",
+        "%m/%d/%Y",
+        "%m/%d/%y",
+        "%m-%d-%Y",
+        "%d-%b-%Y %H:%M:%S",   # 19-Dec-2024 17:28:36
+        "%d-%b-%Y",            # 19-Dec-2024
+        "%d/%b/%Y",
+        "%b %d, %Y",
+        "%B %d, %Y",
+    ]:
         try:
             return datetime.strptime(str(val).strip(), fmt).strftime("%m/%d/%Y")
         except Exception:
@@ -75,7 +86,18 @@ def fmt_date(val):
 def parse_date(val):
     if pd.isna(val) or str(val).strip() == "":
         return None
-    for fmt in ["%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%m/%d/%Y", "%m/%d/%y", "%m-%d-%Y"]:
+    for fmt in [
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%d",
+        "%m/%d/%Y",
+        "%m/%d/%y",
+        "%m-%d-%Y",
+        "%d-%b-%Y %H:%M:%S",   # 19-Dec-2024 17:28:36
+        "%d-%b-%Y",            # 19-Dec-2024
+        "%d/%b/%Y",            # 19/Dec/2024
+        "%b %d, %Y",           # Dec 19, 2024
+        "%B %d, %Y",           # December 19, 2024
+    ]:
         try:
             return datetime.strptime(str(val).strip(), fmt)
         except Exception:
