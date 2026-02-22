@@ -95,7 +95,7 @@ def safe_str(val):
 
 
 def df_to_csv_bytes(df):
-    return df.to_csv(index=False, lineterminator='\r\n').encode('utf-8-sig')
+    return df.to_csv(index=False, lineterminator='\r\n').encode('utf-8')
 
 
 def file_fingerprint(f):
@@ -188,15 +188,23 @@ if process_clicked or (all_uploaded and "results" in st.session_state):
 
                 month_label = prev_month_label()
 
+                # ── Build case/space-insensitive column lookup for df_re (used everywhere) ──
+                re_col_map = {c.strip().lower(): c for c in df_re.columns}
+
+                def re_col(name):
+                    return re_col_map.get(name.strip().lower())
+
+                cnbio_col = re_col('CnBio_ID')
+
                 # ── RE phone lookups ────────────────────────────────────────
-                phone_num_cols  = sorted([c for c in df_re.columns if re.match(r'CnPh_1_\d{2}_Phone_number', c)])
-                phone_type_cols = sorted([c for c in df_re.columns if re.match(r'CnPh_1_\d{2}_Phone_type',   c)])
+                phone_num_cols  = sorted([c for c in df_re.columns if re.match(r'(?i)CnPh_1_\d{2}_Phone_number', c)])
+                phone_type_cols = sorted([c for c in df_re.columns if re.match(r'(?i)CnPh_1_\d{2}_Phone_type',   c)])
 
                 re_phones_map = {}
                 re_types_map  = {}
 
                 for _, row in df_re.iterrows():
-                    bid = safe_str(row.get('CnBio_ID', ''))
+                    bid = safe_str(row.get(cnbio_col, '')) if cnbio_col else ''
                     if not bid:
                         continue
                     phones_set = set()
@@ -270,12 +278,7 @@ if process_clicked or (all_uploaded and "results" in st.session_state):
                 df_phone_type_exists = pd.DataFrame(phone_type_exists_rows)
 
                 # ── Step 5: RE action lookup ─────────────────────────────────
-                re_col_map = {c.strip().lower(): c for c in df_re.columns}
-
-                def re_col(name):
-                    return re_col_map.get(name.strip().lower())
-
-                cnbio_col = re_col('CnBio_ID') or re_col('cnbio_id')
+                # re_col_map, re_col(), and cnbio_col are defined above near phone lookups
 
                 act_groups = []
                 for i in range(1, 6):
