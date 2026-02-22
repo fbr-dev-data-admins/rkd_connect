@@ -393,27 +393,31 @@ if st.button("Process Files", disabled=not all([rkd_appended_phones, rkd_data_up
             for col, (label, val) in zip(cols, metrics):
                 col.metric(label, val)
 
-            # ── Pack all four outputs into a zip for single download ─────
-            import zipfile
-            zip_buf = io.BytesIO()
-            with zipfile.ZipFile(zip_buf, 'w', zipfile.ZIP_DEFLATED) as zf:
-                zf.writestr(f"{month_label} RKD Connect Exceptions.xlsx",      exc_buf.getvalue())
-                zf.writestr(f"{month_label} RKD Connect Phone Import.csv",      phone_csv)
-                zf.writestr(f"{month_label} RKD Connect Action Date Import.csv", action_date_csv)
-                zf.writestr(f"{month_label} RKD Connect Action Note Import.csv", action_note_csv)
-            zip_buf.seek(0)
-
             st.divider()
-            _, center, _ = st.columns([1, 2, 1])
-            with center:
-                st.download_button(
-                    "📦 Download All Outputs (.zip)",
-                    data=zip_buf,
-                    file_name=f"{month_label} RKD Connect Outputs.zip",
-                    mime="application/zip",
-                    use_container_width=True,
-                    type="primary",
-                )
+            st.subheader("Download Outputs")
+            st.caption("Click each button to download individually.")
+            d1, d2, d3, d4 = st.columns(4)
+            with d1:
+                st.download_button("📥 Exceptions Workbook",
+                    data=exc_buf,
+                    file_name=f"{month_label} RKD Connect Exceptions.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True, type="primary")
+            with d2:
+                st.download_button("📥 Phone Import",
+                    data=phone_csv,
+                    file_name=f"{month_label} RKD Connect Phone Import.csv",
+                    mime="text/csv", use_container_width=True, type="primary")
+            with d3:
+                st.download_button("📥 Action Date Import",
+                    data=action_date_csv,
+                    file_name=f"{month_label} RKD Connect Action Date Import.csv",
+                    mime="text/csv", use_container_width=True, type="primary")
+            with d4:
+                st.download_button("📥 Action Note Import",
+                    data=action_note_csv,
+                    file_name=f"{month_label} RKD Connect Action Note Import.csv",
+                    mime="text/csv", use_container_width=True, type="primary")
 
             st.divider()
             st.subheader("Data Previews")
