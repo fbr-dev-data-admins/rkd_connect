@@ -255,33 +255,44 @@ if st.button("Process Files", disabled=not all([rkd_appended_phones, rkd_data_up
             df_phone_type_exists = pd.DataFrame(phone_type_exists_rows)
 
             # ── Step 5: RE action lookup ─────────────────────────────────
+
+            # Build a case/space-insensitive column lookup for df_re
+            re_col_map = {c.strip().lower(): c for c in df_re.columns}
+
+            def re_col(name):
+                """Return the actual df_re column name matching `name` (case+space insensitive)."""
+                return re_col_map.get(name.strip().lower())
+
+            # Find the actual CnBio_ID column name
+            cnbio_col = re_col('CnBio_ID') or re_col('cnbio_id')
+
             act_groups = []
             for i in range(1, 6):
                 n = f"{i:02d}"
-                imp  = f"CnAct_1_{n}_Import_ID"
-                adat = f"CnAct_1_{n}_Action_Date"
-                nimp = f"CnAct_1_{n}_Note_1_01_Import_ID"
-                desc = f"CnAct_1_{n}_Note_1_01_Description"
-                if imp in df_re.columns:
+                imp  = re_col(f"CnAct_1_{n}_Import_ID")
+                adat = re_col(f"CnAct_1_{n}_Action_Date")
+                nimp = re_col(f"CnAct_1_{n}_Note_1_01_Import_ID")
+                desc = re_col(f"CnAct_1_{n}_Note_1_01_Description")
+                if imp:  # column exists in file
                     act_groups.append((imp, adat, nimp, desc))
 
             re_actions_map = {}
 
             for _, row in df_re.iterrows():
-                bid = safe_str(row.get('CnBio_ID', ''))
+                bid = safe_str(row.get(cnbio_col, '')) if cnbio_col else ''
                 if not bid:
                     continue
                 for imp, adat, nimp, desc in act_groups:
-                    description = safe_str(row.get(desc, ''))
+                    description = safe_str(row.get(desc, '')) if desc else ''
                     if 'receiving' not in description.lower():
                         continue
-                    act_date = parse_date(row.get(adat, ''))
+                    act_date = parse_date(row.get(adat, '')) if adat else None
                     if act_date is None:
                         continue
                     re_actions_map.setdefault(bid, []).append({
-                        'import_id':      safe_str(row.get(imp, '')),
+                        'import_id':      safe_str(row.get(imp, '')) if imp else '',
                         'action_date':    act_date,
-                        'note_import_id': safe_str(row.get(nimp, '')),
+                        'note_import_id': safe_str(row.get(nimp, '')) if nimp else '',
                         'description':    description,
                     })
 
@@ -445,7 +456,11 @@ if st.button("Process Files", disabled=not all([rkd_appended_phones, rkd_data_up
                     st.caption("Shows every row from the data upload file and why it matched or failed.")
                     st.dataframe(df_debug, use_container_width=True)
                     # Also show what RE action map keys look like for comparison
-                    st.caption(f"RE action map contains {len(re_actions_map)} unique Constituent IDs. Sample keys: {list(re_actions_map.keys())[:10]}")
+                    st.caption(f"RE action map contains **{len(re_actions_map)}** unique IDs. Sample keys: `{list(re_actions_map.keys())[:10]}`")
+                    st.caption(f"CnBio_ID column resolved to: `{cnbio_col}`")
+                    st.caption(f"Action groups found: {len(act_groups)} — columns: {[g[0] for g in act_groups]}")
+                    st.caption(f"df_re columns (first 10): {list(df_re.columns[:10])}")
+                    st.caption(f"df_upload 'Constituent ID' sample values: {list(df_upload['Constituent ID'].dropna().head(5))}")
 
         except Exception as e:
             st.error(f"An error occurred: {e}")
