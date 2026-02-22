@@ -337,7 +337,7 @@ if process_clicked or (all_uploaded and "results" in st.session_state):
                         no_matching_rows.append(row)
                         continue
 
-                    matching = [a for a in candidates if 0 <= (upload_date - a['action_date']).days <= 45]
+                    matching = [a for a in candidates if abs((upload_date - a['action_date']).days) <= 45]
 
                     if not matching:
                         no_matching_rows.append(row)
