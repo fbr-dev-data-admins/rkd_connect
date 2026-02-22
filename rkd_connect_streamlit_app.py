@@ -300,7 +300,7 @@ if st.button("Process Files", disabled=not all([rkd_appended_phones, rkd_data_up
             no_matching_rows = []
             action_date_rows = []
             action_note_rows = []
-            debug_rows = []
+            # debug_rows = []  # uncomment to re-enable debug panel
 
             # Normalize RE action map keys for comparison
             re_action_map_lower = {k.lstrip('0') or '0': v for k, v in re_actions_map.items()}
@@ -322,39 +322,21 @@ if st.button("Process Files", disabled=not all([rkd_appended_phones, rkd_data_up
                     or []
                 )
 
-                debug_info = {
-                    'Constituent ID':      const_id,
-                    'Time (raw)':          time_raw,
-                    'Parsed upload_date':  str(upload_date),
-                    'ID found in RE map':  bool(candidates),
-                    'Candidate actions':   len(candidates),
-                    'Status':              '',
-                }
+                # debug_info = { ... }  # uncomment debug_rows lines to re-enable
 
                 if upload_date is None:
-                    debug_info['Status'] = 'FAIL: could not parse upload date'
-                    debug_rows.append(debug_info)
                     no_matching_rows.append(row)
                     continue
 
                 matching = []
-                date_details = []
                 for a in candidates:
                     delta = (upload_date - a['action_date']).days
-                    date_details.append(f"act={a['action_date'].strftime('%m/%d/%Y')} delta={delta}d")
                     if 0 <= delta <= 45:
                         matching.append(a)
 
-                debug_info['Date deltas'] = ' | '.join(date_details)
-
                 if not matching:
-                    debug_info['Status'] = 'FAIL: no action within 45 days' if candidates else 'FAIL: constituent ID not in RE actions map'
-                    debug_rows.append(debug_info)
                     no_matching_rows.append(row)
                     continue
-
-                debug_info['Status'] = f'MATCHED {len(matching)} action(s)'
-                debug_rows.append(debug_info)
 
                 fmt_time  = fmt_date(time_raw)
                 note_text = f"RKD Connect thank you call result - {result_val}"
@@ -381,7 +363,7 @@ if st.button("Process Files", disabled=not all([rkd_appended_phones, rkd_data_up
             df_no_matching = pd.DataFrame(no_matching_rows)
             df_action_date = pd.DataFrame(action_date_rows)
             df_action_note = pd.DataFrame(action_note_rows)
-            df_debug       = pd.DataFrame(debug_rows)
+            # df_debug     = pd.DataFrame(debug_rows)  # uncomment to re-enable debug panel
 
 
             # ── Exceptions workbook ──────────────────────────────────────
@@ -411,27 +393,27 @@ if st.button("Process Files", disabled=not all([rkd_appended_phones, rkd_data_up
             for col, (label, val) in zip(cols, metrics):
                 col.metric(label, val)
 
-            st.divider()
-            st.subheader("Download Outputs")
+            # ── Pack all four outputs into a zip for single download ─────
+            import zipfile
+            zip_buf = io.BytesIO()
+            with zipfile.ZipFile(zip_buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+                zf.writestr(f"{month_label} RKD Connect Exceptions.xlsx",      exc_buf.getvalue())
+                zf.writestr(f"{month_label} RKD Connect Phone Import.csv",      phone_csv)
+                zf.writestr(f"{month_label} RKD Connect Action Date Import.csv", action_date_csv)
+                zf.writestr(f"{month_label} RKD Connect Action Note Import.csv", action_note_csv)
+            zip_buf.seek(0)
 
-            d1, d2, d3, d4 = st.columns(4)
-            with d1:
-                st.download_button("📥 Exceptions Workbook (.xlsx)", data=exc_buf,
-                    file_name=f"{month_label} RKD Connect Exceptions.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    use_container_width=True)
-            with d2:
-                st.download_button("📥 Phone Import (.csv)", data=phone_csv,
-                    file_name=f"{month_label} RKD Connect Phone Import.csv",
-                    mime="text/csv", use_container_width=True)
-            with d3:
-                st.download_button("📥 Action Date Import (.csv)", data=action_date_csv,
-                    file_name=f"{month_label} RKD Connect Action Date Import.csv",
-                    mime="text/csv", use_container_width=True)
-            with d4:
-                st.download_button("📥 Action Note Import (.csv)", data=action_note_csv,
-                    file_name=f"{month_label} RKD Connect Action Note Import.csv",
-                    mime="text/csv", use_container_width=True)
+            st.divider()
+            _, center, _ = st.columns([1, 2, 1])
+            with center:
+                st.download_button(
+                    "📦 Download All Outputs (.zip)",
+                    data=zip_buf,
+                    file_name=f"{month_label} RKD Connect Outputs.zip",
+                    mime="application/zip",
+                    use_container_width=True,
+                    type="primary",
+                )
 
             st.divider()
             st.subheader("Data Previews")
@@ -449,18 +431,18 @@ if st.button("Process Files", disabled=not all([rkd_appended_phones, rkd_data_up
                     else:
                         st.dataframe(df, use_container_width=True)
 
-            with st.expander("🔍 Action Matching Debug (expand to diagnose issues)"):
-                if df_debug.empty:
-                    st.info("No upload rows processed.")
-                else:
-                    st.caption("Shows every row from the data upload file and why it matched or failed.")
-                    st.dataframe(df_debug, use_container_width=True)
-                    # Also show what RE action map keys look like for comparison
-                    st.caption(f"RE action map contains **{len(re_actions_map)}** unique IDs. Sample keys: `{list(re_actions_map.keys())[:10]}`")
-                    st.caption(f"CnBio_ID column resolved to: `{cnbio_col}`")
-                    st.caption(f"Action groups found: {len(act_groups)} — columns: {[g[0] for g in act_groups]}")
-                    st.caption(f"df_re columns (first 10): {list(df_re.columns[:10])}")
-                    st.caption(f"df_upload 'Constituent ID' sample values: {list(df_upload['Constituent ID'].dropna().head(5))}")
+            # ── Debug section (commented out) ────────────────────────────
+            # with st.expander("🔍 Action Matching Debug (expand to diagnose issues)"):
+            #     if df_debug.empty:
+            #         st.info("No upload rows processed.")
+            #     else:
+            #         st.caption("Shows every row from the data upload file and why it matched or failed.")
+            #         st.dataframe(df_debug, use_container_width=True)
+            #         st.caption(f"RE action map contains **{len(re_actions_map)}** unique IDs. Sample keys: `{list(re_actions_map.keys())[:10]}`")
+            #         st.caption(f"CnBio_ID column resolved to: `{cnbio_col}`")
+            #         st.caption(f"Action groups found: {len(act_groups)} — columns: {[g[0] for g in act_groups]}")
+            #         st.caption(f"df_re columns (first 10): {list(df_re.columns[:10])}")
+            #         st.caption(f"df_upload 'Constituent ID' sample values: {list(df_upload['Constituent ID'].dropna().head(5))}")
 
         except Exception as e:
             st.error(f"An error occurred: {e}")
