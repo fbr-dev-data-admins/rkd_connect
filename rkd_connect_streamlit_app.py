@@ -58,7 +58,7 @@ def try_read_csv(uploaded):
 def prev_month_label():
     today = date.today()
     prev = today.replace(day=1) - relativedelta(months=1)
-    return prev.strftime("%B %Y")
+    return prev.strftime("%b %Y")
 
 
 def fmt_date(val):
